@@ -6,6 +6,8 @@ function unproxy<T extends Object>(obj: T): T {
 }
 
 function proxy<T extends Object>(obj: T, target: T): T {
+  let methods: WeakMap<Function, Function> | null = null;
+
   return new Proxy<T>(obj, {
     get: (_, prop) => {
       // Return the original object so we can flatten proxies when
@@ -21,10 +23,16 @@ function proxy<T extends Object>(obj: T, target: T): T {
       if (value instanceof Function) {
         const method = unproxy(value);
 
-        // Functions are also objects, and objects can have props.
-        // Proxy the original function so props aren't lost when
-        // binding.
-        return proxy(method.bind(target), method);
+        methods = methods ?? new WeakMap();
+
+        if (!methods.has(method)) {
+          // Functions are also objects, and objects can have props.
+          // Proxy the original function so props aren't lost when
+          // binding.
+          methods.set(method, proxy(method.bind(target), method));
+        }
+
+        return methods.get(method);
       }
 
       return value;
